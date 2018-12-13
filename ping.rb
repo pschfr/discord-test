@@ -7,10 +7,19 @@ require 'discordrb'
 CROSS_MARK = "\u274c".freeze
 
 # Authorizes the bot with a hidden token in .config
-bot = Discordrb::Bot.new token: JSON.parse(File.read('.config'))['token']
+bot = Discordrb::Commands::CommandBot.new(
+  token: JSON.parse(File.read('.config'))['token'],
+  client_id: JSON.parse(File.read('.config'))['client'],
+  prefix: '!'
+)
 
-# Upon recieving --help, do this...
-bot.message(content: '--help') do |event|
+# Simplest bot out there, returns random number between a range
+bot.command :random do |min, max|
+  rand min.to_i..max.to_i
+end
+
+# Upon recieving help, do this...
+bot.command :help do |event|
   # Send message, and store it that we can issue a delete request later
   message = event.respond %(
     Hello! This is a test bot.\n
