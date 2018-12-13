@@ -3,29 +3,39 @@
 require 'json'
 require 'discordrb'
 
+# the unicode ":x:" emoji
+CROSS_MARK = "\u274c".freeze
+
 # Authorizes the bot with a hidden token in .config
 bot = Discordrb::Bot.new token: JSON.parse(File.read('.config'))['token']
 
-# This method call adds an event handler that will be called on any message
-# that exactly contains the string "Ping!".
-# The code inside it will be executed, and a "Pong!" response will be sent.
-bot.message(content: 'Ping!') do |event|
-  # The `respond` method returns a `Message` object, which is stored in a
-  # variable `m`. The `edit` method is then called to edit the message with the
-  # time difference between when the event was received and after the message
-  # was sent.
-  m = event.respond('Pong!')
-  m.edit "Pong! Time taken: #{Time.now - event.timestamp} seconds."
-end
+# Upon recieving --help, do this...
+bot.message(content: '--help') do |event|
+  # Construct help message string
+  help_message = %(
+    Hello! This is a test bot.\n
+    The time is: #{Time.now.strftime('%F %T %Z')}.\n
+    If you click the #{CROSS_MARK}, this message will disappear.
+  )
 
-# The `mention` event is called if the bot is *directly mentioned*, i.e. not
-# using a role mention or @everyone/@here.
-bot.mention do |event|
-  # The `pm` method is used to send a private message (also called a DM or
-  # direct message) to the user who sent the initial message.
-  event.user.pm('You have mentioned me!')
+  # Send message, and store it that we can issue a delete request later
+  message = event.respond help_message
 
-  event.respond("You have mentioned me: @#{event.user.username}##{event.user.discriminator}")
+  # React to the message to give a user an easy "button" to press
+  message.react CROSS_MARK
+
+  # Add an await for a ReactionAddEvent, that will only trigger for reactions
+  # that match our CROSS_MARK emoji. This time, I'm using interpolation to make
+  # the await key unique for this event so that multiple awaits can exist.
+  bot.add_await(:"delete_#{message.id}", Discordrb::Events::ReactionAddEvent, emoji: CROSS_MARK) do |reaction_event|
+    # Since this code will run on every CROSS_MARK reaction, it might not
+    # be on our time message we sent earlier. We use `next` to skip the rest
+    # of the block unless it was our message that was reacted to.
+    next true unless reaction_event.message.id == message.id
+
+    # Delete the matching message.
+    message.delete
+  end
 end
 
 # This method call has to be put at the end of your script,
